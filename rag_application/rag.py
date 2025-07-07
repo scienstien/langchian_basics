@@ -5,50 +5,47 @@ from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 from langchain.vectorstores import FAISS
-from langchain.llms import HuggingFaceHub, HuggingFacePipeline
+from langchain_community.llms.huggingface_pipeline import  HuggingFacePipeline
 from langchain.memory import ConversationBufferMemory
+from langchain.chains.llm import LLMChain
 
 import os
 from langchain.chains import RetrievalQA, LLMChain
 from langchain.prompts import PromptTemplate
 from transformers import pipeline
 
-def Vector_stores(text):
+def Vector_stores(text_chunks):
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vector_store = FAISS.from_texts(texts=text, embedding=embeddings)
-    return vector_store
+    db = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    return db
 
-def get_conversation_chain(Vector):
-    # Use a local model pipeline instead of HuggingFaceHub
+def get_conversation_chain(db, query , k=3):
+    docs = db.similarity_search(query, k=k)
+    docs_text = "".join([doc.page_content for doc in docs])
     local_pipeline = pipeline("text2text-generation", model="google/flan-t5-base")
     llm = HuggingFacePipeline(pipeline=local_pipeline)
+    propmt = PromptTemplate(
+        input_variables= ['question', 'context'],
+        template = """
+    Answer the question as clearly and completely as possible using the provided context.
+    If the answer requires multiple points, list them as bullet points.
 
-    memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
+    Context:
+    {context}
 
-    prompt_template = PromptTemplate(
-        input_variables=["context", "question"],
-        template="""Use the following context to answer the question.
+    Question:
+    {question}
 
-        Context: {context}
-        Question: {question}
-        Answer:"""
+    Answer:
+    """
     )
-
-    chain = LLMChain(
-        llm=llm,
-        prompt=prompt_template,
-        memory=memory
-    )
-
-    retriever = Vector.as_retriever()
-
-    qa = RetrievalQA(
-        retriever=retriever,
-        combine_documents_chain=chain,
-        return_source_documents=True
-    )
-
-    return qa
+    chain = LLMChain(llm=llm, prompt=propmt, verbose=True)
+    response = chain.run({
+        'question': query,
+        'context': docs_text
+    })
+    response = response.replace('\n', ' ')
+    return response
 
 def get_pdf_text(pdf_docs):
     text = ''
@@ -58,35 +55,8 @@ def get_pdf_text(pdf_docs):
             text += page.extract_text()
     return text
 
-def get_text_chunks(raw_text):
+def get_text_chunks(text):
     text_spliter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=400)
-    text = text_spliter.split_text(raw_text)
-    return text
+    text_chunks = text_spliter.split_text(text)
+    return text_chunks
 
-def main():
-    load_dotenv()
-    print("HF Token Loaded:", os.getenv("HUGGINGFACEHUB_API_TOKEN"))
-
-    st.set_page_config(page_title="Spider Task 2", page_icon=":books:")
-
-    st.header("Spider Task 2 :books:")
-    st.text_input("Ask questions from the pdfs")
-
-    if 'conversation' not in st.session_state:
-        st.session_state.conversation = None
-
-    with st.sidebar:
-        st.subheader("Your Header")
-        pdf_docs = st.file_uploader('Upload your pdf here', accept_multiple_files=True)
-        if st.button("Thinkingt"):
-            with st.spinner("Processing"):
-                raw_text = get_pdf_text(pdf_docs)
-                text_chunks = get_text_chunks(raw_text)
-                Vector = Vector_stores(text_chunks)
-                st.session_state.conversation = get_conversation_chain(Vector)
-                st.success("Successfully loaded")
-
-    st.session_state.conversation
-
-if __name__ == '__main__':
-    main()

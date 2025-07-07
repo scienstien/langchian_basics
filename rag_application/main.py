@@ -1,5 +1,5 @@
 import streamlit as st
-import rag_model
+import rag as rag_model
 import textwrap
 
 
