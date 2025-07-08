@@ -1,7 +1,7 @@
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
+from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 from langchain.vectorstores import FAISS
@@ -23,34 +23,34 @@ def Vector_stores(text_chunks):
 # Use this version of the function if you want to use the local model
 # 
 # def get_conversation_chain(db, query , k=3):
-    docs = db.similarity_search(query, k=k)
-    docs_text = "".join([doc.page_content for doc in docs])
-    local_pipeline = pipeline("text2text-generation", model="google/flan-t5-base")
-    llm = HuggingFacePipeline(pipeline=local_pipeline)
-    propmt = PromptTemplate(
-        input_variables= ['question', 'context'],
-        template = """
-    Answer the question as clearly and completely as possible using the provided context.
-    If the answer requires multiple points, list them as bullet points.
+    # docs = db.similarity_search(query, k=k)
+    # docs_text = "".join([doc.page_content for doc in docs])
+    # local_pipeline = pipeline("text2text-generation", model="google/flan-t5-base")
+    # llm = HuggingFacePipeline(pipeline=local_pipeline)
+    # propmt = PromptTemplate(
+    #     input_variables= ['question', 'context'],
+    #     template = """
+    # Answer the question as clearly and completely as possible using the provided context.
+    # If the answer requires multiple points, list them as bullet points.
 
-    Context:
-    {context}
+    # Context:
+    # {context}
 
-    Question:
-    {question}
+    # Question:
+    # {question}
 
-    Answer:
-    """
-    )
-    chain = LLMChain(llm=llm, prompt=propmt, verbose=True)
-    response = chain.run({
-        'question': query,
-        'context': docs_text
-    })
-    response = response.replace('\n', ' ')
-    return response
+    # Answer:
+    # """
+    # )
+    # chain = LLMChain(llm=llm, prompt=propmt, verbose=True)
+    # response = chain.run({
+    #     'question': query,
+    #     'context': docs_text
+    # })
+    # response = response.replace('\n', ' ')
+    # return response
 
-
+# Use this version of the function if you want to use the google model(cloud model)
 def get_conversation_chain(db, query , k=3):
 
 
